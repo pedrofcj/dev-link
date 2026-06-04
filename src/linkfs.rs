@@ -55,7 +55,10 @@ pub fn move_item(src: &Path, dst: &Path) -> Result<()> {
     match fs::rename(src, dst) {
         Ok(()) => Ok(()),
         Err(e) if is_cross_device(&e) => {
-            copy_recursive(src, dst)?;
+            copy_recursive(src, dst).map_err(|err| {
+                remove_path(dst).ok(); // best-effort cleanup of partial dst
+                err
+            })?;
             remove_path(src)?;
             Ok(())
         }
@@ -65,16 +68,11 @@ pub fn move_item(src: &Path, dst: &Path) -> Result<()> {
 }
 
 fn is_cross_device(e: &std::io::Error) -> bool {
-    #[cfg(unix)]
-    {
-        e.raw_os_error() == Some(18) // EXDEV
-    }
-    #[cfg(windows)]
-    {
-        e.raw_os_error() == Some(17) // ERROR_NOT_SAME_DEVICE
-    }
+    e.kind() == std::io::ErrorKind::CrossesDevices
 }
 
+// NOTE: dereferences symlinks (is_dir() and fs::copy follow them). Callers move
+// real dir/file trees here, not symlinks; do not reuse on trees with symlink loops.
 fn copy_recursive(src: &Path, dst: &Path) -> Result<()> {
     if src.is_dir() {
         fs::create_dir_all(dst)?;
@@ -92,7 +90,8 @@ fn copy_recursive(src: &Path, dst: &Path) -> Result<()> {
 }
 
 fn remove_path(p: &Path) -> Result<()> {
-    if p.is_dir() {
+    let is_dir = fs::symlink_metadata(p).map(|m| m.is_dir()).unwrap_or(false);
+    if is_dir {
         fs::remove_dir_all(p)?;
     } else {
         fs::remove_file(p)?;
@@ -106,12 +105,14 @@ fn same_volume(link: &Path, target: &Path) -> bool {
         let base = if p.exists() {
             dunce::canonicalize(p).ok()?
         } else {
+            // precondition: link's parent dir should exist; if missing, vol() returns None -> safe symlink fallback
             dunce::canonicalize(p.parent()?).ok()?
         };
         match base.components().next()? {
             std::path::Component::Prefix(pre) => {
                 Some(pre.as_os_str().to_string_lossy().to_uppercase())
             }
+            // Volume-GUID/UNC prefixes -> None -> safe cross-volume (symlink) fallback
             _ => None,
         }
     }
