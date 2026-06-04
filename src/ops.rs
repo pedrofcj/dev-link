@@ -51,8 +51,8 @@ pub fn link(project: &Path, central: &Path, items: &[String]) -> Result<()> {
                 // healthy link (target resolves) -> nothing to do
                 eprintln!("skip {item} (already a link)");
             } else {
-                // dangling link: central target missing. Do NOT fake success.
-                eprintln!("skip {item} (dangling link; central target missing — inspect manually)");
+                // dangling link: target missing. Do NOT fake success.
+                eprintln!("skip {item} (dangling link; target missing — remove it and re-run)");
             }
             continue;
         }
@@ -140,7 +140,7 @@ pub fn relink(project: &Path, central: &Path, items: &[String]) -> Result<()> {
             if src.exists() {
                 eprintln!("skip {item} (already a link)");
             } else {
-                eprintln!("skip {item} (dangling link; central target missing — inspect manually)");
+                eprintln!("skip {item} (dangling link; target missing — remove it and re-run)");
             }
             continue;
         }
