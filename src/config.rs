@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub const DEFAULT_ITEMS: &[&str] = &[".planning", "docs", ".docs", ".omc"];
 
