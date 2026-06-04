@@ -40,7 +40,8 @@ mod tests {
     use tempfile::tempdir;
 
     fn git(dir: &Path, args: &[&str]) {
-        Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
+        let out = Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
+        assert!(out.status.success(), "git {args:?} failed: {out:?}");
     }
 
     #[test]
