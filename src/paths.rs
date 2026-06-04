@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+/// Non-UTF-8 bytes are replaced with U+FFFD; pass a canonicalized path on Windows.
 /// Leaf name of the repo root, used as the central subfolder name.
 pub fn repo_name(repo_root: &Path) -> String {
     repo_root
@@ -10,6 +11,7 @@ pub fn repo_name(repo_root: &Path) -> String {
 
 /// Central destination dir for a project: `central/<repo_name>[/<rel>]`,
 /// where `rel` is `project` relative to `repo_root` (empty when equal).
+/// If `project` is not inside `repo_root`, falls back to `central/<repo_name>`.
 pub fn dest_dir(central: &Path, repo_root: &Path, project: &Path) -> PathBuf {
     let mut dest = central.join(repo_name(repo_root));
     if let Ok(rel) = project.strip_prefix(repo_root) {
