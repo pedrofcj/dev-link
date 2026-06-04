@@ -119,3 +119,33 @@ pub fn link(project: &Path, central: &Path, items: &[String]) -> Result<()> {
     }
     Ok(())
 }
+
+/// Rebuild links from central without moving (fresh-machine case).
+pub fn relink(project: &Path, central: &Path, items: &[String]) -> Result<()> {
+    let central = std::path::absolute(central)?;
+    let (project, repo_name, dest) = resolve_dest(project, &central)?;
+    if !dest.exists() {
+        bail!("no central folder for project: {}", dest.display());
+    }
+
+    for item in items {
+        let src = project.join(item);
+        let tgt = dest.join(item);
+
+        if !tgt.exists() {
+            eprintln!("skip {item} (not in central)");
+            continue;
+        }
+        if src.exists() || linkfs::is_link(&src) {
+            eprintln!("skip {item} (already present in project)");
+            continue;
+        }
+        if let Some(p) = src.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        linkfs::make_link(&src, &tgt)?;
+        println!("relinked  {item}  ->  {}", tgt.display());
+        warn_if_leak(&project, &repo_name, item);
+    }
+    Ok(())
+}
