@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -11,19 +11,19 @@ pub struct Config {
 }
 
 /// `~/.config/dev-link/config.toml` on every OS (Windows uses %USERPROFILE%).
-pub fn config_path() -> PathBuf {
-    home_dir().join(".config").join("dev-link").join("config.toml")
+pub fn config_path() -> Result<PathBuf> {
+    Ok(home_dir()?.join(".config").join("dev-link").join("config.toml"))
 }
 
-fn home_dir() -> PathBuf {
+fn home_dir() -> Result<PathBuf> {
     let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
     std::env::var_os(var)
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
+        .ok_or_else(|| anyhow!("{var} is not set; cannot locate home directory (set HOME or USERPROFILE)"))
 }
 
 pub fn load() -> Result<Config> {
-    let path = config_path();
+    let path = config_path()?;
     if !path.exists() {
         return Ok(Config::default());
     }
@@ -60,11 +60,21 @@ pub fn resolve_items(flag: Option<&[String]>, cfg: &Config) -> Vec<String> {
 
 /// Write a config template (creates parent dirs). Used by `dev-link init`.
 pub fn write_template(central: Option<&str>) -> Result<()> {
-    let path = config_path();
+    let path = config_path()?;
+    if path.exists() {
+        eprintln!(
+            "config already exists at {} (leaving unchanged; delete it to regenerate)",
+            path.display()
+        );
+        return Ok(());
+    }
     if let Some(p) = path.parent() {
         std::fs::create_dir_all(p)?;
     }
-    let central = central.unwrap_or("/path/to/dev-docs").replace('\\', "\\\\");
+    let central = central
+        .unwrap_or("/path/to/dev-docs")
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
     let body = format!(
         "central = \"{central}\"\nitems   = [\".planning\", \"docs\", \".docs\", \".omc\"]\n"
     );
