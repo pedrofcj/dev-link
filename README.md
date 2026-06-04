@@ -4,6 +4,10 @@ Cross-platform CLI that externalizes a repo's gitignored docs/plans into a
 central private repo and replaces them with links. Port of the original
 `link-project.ps1` / `relink.ps1`. Runs from any terminal on Windows, Linux, macOS.
 
+## Install
+
+    cargo install --path .
+
 ## Configure (once)
 
     dev-link init --central /path/to/dev-docs
@@ -12,6 +16,8 @@ Writes `~/.config/dev-link/config.toml`:
 
     central = "/path/to/dev-docs"
     items   = [".planning", "docs", ".docs", ".omc"]
+
+Items that don't exist in the project are skipped silently.
 
 ## Onboard a repo
 
@@ -29,6 +35,8 @@ creates `<central>/myRepo/src/frontend/.env`.
     git clone <central-remote> /path/to/dev-docs
     cd /path/to/myRepo
     dev-link relink
+
+(Pass `--central /path/to/dev-docs` if you haven't run `dev-link init` on this machine yet.)
 
 ## Linking rules
 
