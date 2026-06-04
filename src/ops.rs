@@ -136,7 +136,15 @@ pub fn relink(project: &Path, central: &Path, items: &[String]) -> Result<()> {
             eprintln!("skip {item} (not in central)");
             continue;
         }
-        if src.exists() || linkfs::is_link(&src) {
+        if linkfs::is_link(&src) {
+            if src.exists() {
+                eprintln!("skip {item} (already a link)");
+            } else {
+                eprintln!("skip {item} (dangling link; central target missing — inspect manually)");
+            }
+            continue;
+        }
+        if src.exists() {
             eprintln!("skip {item} (already present in project)");
             continue;
         }
