@@ -43,16 +43,20 @@ pub fn resolve_central(flag: Option<&str>, cfg: &Config) -> Result<PathBuf> {
     bail!("no central configured: run 'dev-link init --central <path>' or pass --central");
 }
 
-/// items: flag (non-empty) > config (non-empty) > built-in default.
+/// items: flag (non-blank) > config (non-blank) > built-in default.
 pub fn resolve_items(flag: Option<&[String]>, cfg: &Config) -> Vec<String> {
     if let Some(items) = flag {
+        let items: Vec<String> =
+            items.iter().filter(|s| !s.trim().is_empty()).cloned().collect();
         if !items.is_empty() {
-            return items.to_vec();
+            return items;
         }
     }
     if let Some(items) = &cfg.items {
+        let items: Vec<String> =
+            items.iter().filter(|s| !s.trim().is_empty()).cloned().collect();
         if !items.is_empty() {
-            return items.clone();
+            return items;
         }
     }
     DEFAULT_ITEMS.iter().map(|s| s.to_string()).collect()
@@ -122,5 +126,18 @@ mod tests {
         let c = cfg(None, Some(vec!["a", "b"]));
         let got = resolve_items(Some(&["x".to_string()]), &c);
         assert_eq!(got, vec!["x"]);
+    }
+
+    #[test]
+    fn items_filters_blank_entries() {
+        // a trailing comma in --items yields an empty element; it must be dropped.
+        let got = resolve_items(Some(&["docs".to_string(), "".to_string()]), &Config::default());
+        assert_eq!(got, vec!["docs"]);
+    }
+
+    #[test]
+    fn items_all_blank_falls_back_to_default() {
+        let got = resolve_items(Some(&["".to_string(), "  ".to_string()]), &Config::default());
+        assert_eq!(got, vec![".planning", "docs", ".docs", ".omc"]);
     }
 }
