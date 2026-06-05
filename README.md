@@ -17,7 +17,7 @@ Writes `~/.config/dev-link/config.toml`:
     central = "/path/to/dev-docs"
     items   = [".planning", "docs", ".docs", ".omc"]
 
-Items that don't exist in the project are skipped silently.
+Items that don't exist in the project are skipped (a `skip ...` note is printed to stderr).
 
 ## Onboard a repo
 
@@ -42,8 +42,12 @@ creates `<central>/myRepo/src/frontend/.env`.
 
 | Item | Linux/macOS | Windows |
 |------|-------------|---------|
-| directory | symlink | junction (no Developer Mode) |
-| file | symlink | symlink_file (needs Developer Mode ON or admin) |
+| directory | symlink | junction if same volume as central (no Developer Mode); else `symlink_dir` (needs Developer Mode ON or admin) |
+| file | symlink | `symlink_file` (needs Developer Mode ON or admin) |
+
+The no-Developer-Mode path applies to directory items on the **same volume** as
+the central repo (the common case). Cross-volume directories and all file items
+fall back to real symlinks, which on Windows need Developer Mode or an admin shell.
 
 `--central` overrides config; if neither is set, `dev-link` errors and asks you
 to configure. Requires `git` on PATH.

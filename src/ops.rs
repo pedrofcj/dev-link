@@ -12,14 +12,21 @@ fn validate_item(item: &str) -> Result<()> {
     if p.is_absolute() {
         bail!("unsafe item '{item}': must be a relative path inside the project");
     }
+    let mut has_normal = false;
     for c in p.components() {
         match c {
-            Component::Normal(_) | Component::CurDir => {}
+            Component::Normal(_) => has_normal = true,
+            Component::CurDir => {}
             Component::ParentDir => bail!("unsafe item '{item}': '..' is not allowed"),
             Component::RootDir | Component::Prefix(_) => {
                 bail!("unsafe item '{item}': absolute or drive-rooted paths are not allowed")
             }
         }
+    }
+    // Require a real leaf: `.` / `./` resolve to the project root itself, which
+    // would move the entire project into central.
+    if !has_normal {
+        bail!("unsafe item '{item}': must name a path inside the project (not '.')");
     }
     Ok(())
 }
@@ -201,6 +208,13 @@ mod tests {
     fn rejects_parent_dir() {
         assert!(validate_item("../escape").is_err());
         assert!(validate_item("a/../../b").is_err());
+    }
+
+    #[test]
+    fn rejects_current_dir_only() {
+        // `.` / `./` resolve to the project root — must not be treated as an item.
+        assert!(validate_item(".").is_err());
+        assert!(validate_item("./").is_err());
     }
 
     #[test]
