@@ -205,8 +205,14 @@ mod tests {
 
     #[test]
     fn rejects_absolute_and_drive() {
+        // Absolute (leading-/ RootDir) is rejected on every OS.
         assert!(validate_item("/etc/passwd").is_err());
-        // Windows drive-rooted / absolute forms
-        assert!(validate_item("C:\\Windows").is_err() || validate_item("C:/Windows").is_err());
+        // Drive prefixes only exist on Windows; on unix `C:\Windows` / `C:/Windows`
+        // are legitimately *relative* filenames that cannot escape the project.
+        #[cfg(windows)]
+        {
+            assert!(validate_item("C:\\Windows").is_err());
+            assert!(validate_item("C:Windows").is_err());
+        }
     }
 }
