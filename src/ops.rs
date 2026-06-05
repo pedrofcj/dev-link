@@ -28,7 +28,8 @@ fn warn_if_leak(project: &Path, repo_name: &str, item: &str) {
             .unwrap_or_else(|| item.to_string());
         eprintln!(
             "LEAK RISK: '{item}' is NOT ignored by {repo_name}'s git. Add no-slash \
-             '{base}' to ~/.config/git/ignore BEFORE committing the project repo."
+             '{base}' to ~/.config/git/ignore (or '{item}' to the repo's .git/info/exclude) \
+             BEFORE committing the project repo."
         );
     }
 }

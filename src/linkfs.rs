@@ -55,9 +55,8 @@ pub fn move_item(src: &Path, dst: &Path) -> Result<()> {
     match fs::rename(src, dst) {
         Ok(()) => Ok(()),
         Err(e) if is_cross_device(&e) => {
-            copy_recursive(src, dst).map_err(|err| {
+            copy_recursive(src, dst).inspect_err(|_| {
                 remove_path(dst).ok(); // best-effort cleanup of partial dst
-                err
             })?;
             remove_path(src)?;
             Ok(())
