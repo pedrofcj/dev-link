@@ -3,6 +3,27 @@ use std::path::{Path, PathBuf};
 
 use crate::{git, linkfs, paths};
 
+/// Reject items that could escape the project/central dirs. Items are operator-
+/// supplied, but an absolute path makes `Path::join` discard the base and `..`
+/// escapes the directory — on a tool that moves bytes, fail fast instead.
+fn validate_item(item: &str) -> Result<()> {
+    use std::path::Component;
+    let p = Path::new(item);
+    if p.is_absolute() {
+        bail!("unsafe item '{item}': must be a relative path inside the project");
+    }
+    for c in p.components() {
+        match c {
+            Component::Normal(_) | Component::CurDir => {}
+            Component::ParentDir => bail!("unsafe item '{item}': '..' is not allowed"),
+            Component::RootDir | Component::Prefix(_) => {
+                bail!("unsafe item '{item}': absolute or drive-rooted paths are not allowed")
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Canonicalize project, find repo root (fallback = project), compute dest.
 /// `central` should already be absolute (callers normalize via `std::path::absolute`).
 /// Returns (canonical_project, repo_name, dest_dir).
@@ -36,6 +57,9 @@ fn warn_if_leak(project: &Path, repo_name: &str, item: &str) {
 
 /// Move each item out of the project into central + link back.
 pub fn link(project: &Path, central: &Path, items: &[String]) -> Result<()> {
+    for item in items {
+        validate_item(item)?;
+    }
     let central = std::path::absolute(central)?;
     let (project, repo_name, dest) = resolve_dest(project, &central)?;
     std::fs::create_dir_all(&dest)?;
@@ -123,6 +147,9 @@ pub fn link(project: &Path, central: &Path, items: &[String]) -> Result<()> {
 
 /// Rebuild links from central without moving (fresh-machine case).
 pub fn relink(project: &Path, central: &Path, items: &[String]) -> Result<()> {
+    for item in items {
+        validate_item(item)?;
+    }
     let central = std::path::absolute(central)?;
     let (project, repo_name, dest) = resolve_dest(project, &central)?;
     if !dest.exists() {
@@ -157,4 +184,29 @@ pub fn relink(project: &Path, central: &Path, items: &[String]) -> Result<()> {
         warn_if_leak(&project, &repo_name, item);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_item;
+
+    #[test]
+    fn accepts_normal_relative_items() {
+        for ok in [".planning", "docs", ".docs", ".omc", ".env", "docs/api"] {
+            assert!(validate_item(ok).is_ok(), "{ok} should be allowed");
+        }
+    }
+
+    #[test]
+    fn rejects_parent_dir() {
+        assert!(validate_item("../escape").is_err());
+        assert!(validate_item("a/../../b").is_err());
+    }
+
+    #[test]
+    fn rejects_absolute_and_drive() {
+        assert!(validate_item("/etc/passwd").is_err());
+        // Windows drive-rooted / absolute forms
+        assert!(validate_item("C:\\Windows").is_err() || validate_item("C:/Windows").is_err());
+    }
 }

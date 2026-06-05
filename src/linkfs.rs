@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::Path;
 
@@ -70,10 +70,18 @@ fn is_cross_device(e: &std::io::Error) -> bool {
     e.kind() == std::io::ErrorKind::CrossesDevices
 }
 
-// NOTE: dereferences symlinks (is_dir() and fs::copy follow them). Callers move
-// real dir/file trees here, not symlinks; do not reuse on trees with symlink loops.
+// Cross-volume move fallback. Refuses to copy a symlink rather than silently
+// dereferencing it (which would change move semantics / copy unexpected data).
 fn copy_recursive(src: &Path, dst: &Path) -> Result<()> {
-    if src.is_dir() {
+    let meta = fs::symlink_metadata(src)?;
+    if meta.file_type().is_symlink() {
+        bail!(
+            "cross-volume move cannot faithfully copy the symlink {}; move the item to \
+             the same volume as central, or remove the nested symlink and retry",
+            src.display()
+        );
+    }
+    if meta.is_dir() {
         fs::create_dir_all(dst)?;
         for entry in fs::read_dir(src)? {
             let entry = entry?;
