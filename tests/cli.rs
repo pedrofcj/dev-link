@@ -187,3 +187,88 @@ fn errors_without_central() {
         .failure()
         .stderr(predicates::str::contains("no central configured"));
 }
+
+#[test]
+fn project_marker_overrides_repo_name() {
+    let root = tempdir().unwrap();
+    let home = empty_home(root.path());
+    let repo = root.path().join("myRepo");
+    let nested = repo.join("src").join("frontend");
+    let central = root.path().join("central");
+    fs::create_dir_all(repo.join(".planning")).unwrap();
+    fs::create_dir_all(nested.join(".planning")).unwrap();
+    git_init(&repo);
+    fs::write(repo.join(".gitignore"), ".planning\n").unwrap();
+
+    // init from a subdir: marker lands at the repo root, project defaults to its name
+    dev_link(&home)
+        .args(["project", "init", "--workspace", "work", "--path"]).arg(&nested)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("<central>/work/myRepo"));
+    let text = fs::read_to_string(repo.join(".dev-link.toml")).unwrap();
+    assert!(text.contains("workspace = \"work\"") && text.contains("project = \"myRepo\""));
+
+    // explicit project name wins over the folder name
+    dev_link(&home)
+        .args(["project", "init", "--workspace", "work", "--project", "renamed", "--force", "--path"])
+        .arg(&repo)
+        .assert()
+        .success();
+
+    dev_link(&home)
+        .args(["link", "--items", ".planning", "--project"]).arg(&repo)
+        .arg("--central").arg(&central)
+        .assert()
+        .success();
+    dev_link(&home)
+        .args(["link", "--items", ".planning", "--project"]).arg(&nested)
+        .arg("--central").arg(&central)
+        .assert()
+        .success();
+
+    let base = central.join("work").join("renamed");
+    assert!(base.join(".planning").is_dir());
+    assert!(base.join("src").join("frontend").join(".planning").is_dir());
+    assert!(!central.join("myRepo").exists());
+}
+
+#[test]
+fn project_init_refuses_overwrite_and_bad_names() {
+    let root = tempdir().unwrap();
+    let home = empty_home(root.path());
+    let repo = root.path().join("r");
+    fs::create_dir_all(&repo).unwrap();
+
+    dev_link(&home)
+        .args(["project", "init", "--workspace", "../up", "--path"]).arg(&repo)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("invalid workspace"));
+
+    dev_link(&home)
+        .args(["project", "init", "--workspace", "w", "--path"]).arg(&repo)
+        .assert()
+        .success();
+    dev_link(&home)
+        .args(["project", "init", "--workspace", "w", "--path"]).arg(&repo)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("already exists"));
+}
+
+#[test]
+fn project_init_workspace_defaults_to_default() {
+    let root = tempdir().unwrap();
+    let home = empty_home(root.path());
+    let repo = root.path().join("myRepo");
+    fs::create_dir_all(&repo).unwrap();
+
+    dev_link(&home)
+        .args(["project", "init", "--path"]).arg(&repo)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("<central>/default/myRepo"));
+    let text = fs::read_to_string(repo.join(".dev-link.toml")).unwrap();
+    assert!(text.contains("workspace = \"default\""));
+}

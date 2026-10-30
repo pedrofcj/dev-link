@@ -30,6 +30,26 @@ Moves each item into `<central>/<repo>[/<subpath>]/` and links it back. Nested
 paths are mirrored: from `myRepo/src/frontend`, `dev-link link --items .env`
 creates `<central>/myRepo/src/frontend/.env`.
 
+## Pin a repo to a workspace/project
+
+    cd /path/to/myRepo
+    dev-link project init                                # default/<repo folder name>
+    dev-link project init --workspace work --project api # explicit names
+
+`--workspace` defaults to `default`; `--project` defaults to the repo folder name.
+
+Writes `.dev-link.toml` at the repo root:
+
+    workspace = "work"
+    project = "api"
+
+When this marker exists at or above the project dir, `link` and `relink` use
+`<central>/<workspace>/<project>[/<subpath>]` and skip git-based name detection
+entirely. Subpaths are mirrored relative to the marker's folder. Both names must
+be single folder names (no `/`, `\`, `.` or `..`). A malformed marker is an
+error, not a fallback. Pass `--path <dir>` to target another repo, `--force` to
+overwrite an existing marker.
+
 ## Fresh machine
 
     git clone <central-remote> /path/to/dev-docs

@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use std::path::{Path, PathBuf};
 
-use crate::{git, linkfs, paths};
+use crate::{git, linkfs, marker, paths};
 
 /// Reject items that could escape the project/central dirs. Items are operator-
 /// supplied, but an absolute path makes `Path::join` discard the base and `..`
@@ -31,7 +31,9 @@ fn validate_item(item: &str) -> Result<()> {
     Ok(())
 }
 
-/// Canonicalize project, find repo root (fallback = project), compute dest.
+/// Canonicalize project, then compute dest. A `.dev-link.toml` marker at or above
+/// the project wins: dest is `central/<workspace>/<project>[/<rel>]`, no git lookup.
+/// Otherwise find repo root (fallback = project) and use its leaf name.
 /// `central` should already be absolute (callers normalize via `std::path::absolute`).
 /// Returns (canonical_project, repo_name, dest_dir).
 pub fn resolve_dest(project: &Path, central: &Path) -> Result<(PathBuf, String, PathBuf)> {
@@ -39,6 +41,11 @@ pub fn resolve_dest(project: &Path, central: &Path) -> Result<(PathBuf, String, 
         bail!("project not found: {}", project.display());
     }
     let project = dunce::canonicalize(project)?;
+    if let Some((root, m)) = marker::find(&project)? {
+        let base = central.join(&m.workspace).join(&m.project);
+        let dest = paths::mirror(&base, &root, &project);
+        return Ok((project, m.label(), dest));
+    }
     let repo_root = git::repo_root(&project)
         .and_then(|r| dunce::canonicalize(&r).ok())
         .unwrap_or_else(|| project.clone());

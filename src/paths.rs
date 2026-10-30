@@ -13,8 +13,14 @@ pub fn repo_name(repo_root: &Path) -> String {
 /// where `rel` is `project` relative to `repo_root` (empty when equal).
 /// If `project` is not inside `repo_root`, falls back to `central/<repo_name>`.
 pub fn dest_dir(central: &Path, repo_root: &Path, project: &Path) -> PathBuf {
-    let mut dest = central.join(repo_name(repo_root));
-    if let Ok(rel) = project.strip_prefix(repo_root) {
+    mirror(&central.join(repo_name(repo_root)), repo_root, project)
+}
+
+/// `base[/<rel>]`, where `rel` is `project` relative to `root` (empty when equal
+/// or when `project` is not inside `root`).
+pub fn mirror(base: &Path, root: &Path, project: &Path) -> PathBuf {
+    let mut dest = base.to_path_buf();
+    if let Ok(rel) = project.strip_prefix(root) {
         if !rel.as_os_str().is_empty() {
             dest = dest.join(rel);
         }
